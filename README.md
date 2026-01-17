@@ -438,7 +438,7 @@ req.path         // URL path (/products)
 
 ## What's Next?
 
-Now that you understand Express basics, you can:
+Now that we understand Express basics, you can:
 
 1. **Connect to a database** (MongoDB, PostgreSQL, etc.)
 2. **Add authentication** (JWT, sessions)

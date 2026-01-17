@@ -50,11 +50,11 @@ npm --version
    ```
    This creates a `package.json` file that tracks your project dependencies.
 
-2. **Install Express:**
+2. **Install Express and CORS:**
    ```bash
-   npm install express
+   npm install express cors
    ```
-   A `node_modules` folder will appear — this is where Express lives. You don't need to touch it!
+   A `node_modules` folder will appear — this is where all the package code lives. You don't need to touch it!
 
 ---
 

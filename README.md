@@ -17,6 +17,7 @@
 - [POST Requests & Forms](#post-requests--forms)
 - [Express Router](#express-router)
 - [Middleware](#middleware)
+- [Connecting to a Database (Prisma)](#connecting-to-a-database-prisma)
 - [Project Structure](#project-structure)
 
 ---
@@ -396,17 +397,236 @@ app.use(express.json());
 
 ---
 
+## Connecting to a Database (Prisma)
+
+So far, our data disappears when the server restarts. To persist data, we need a **database**. We'll use **Prisma** — a modern database toolkit for Node.js.
+
+### What is Prisma?
+
+Prisma is an **ORM** (Object-Relational Mapper) that lets you interact with databases using JavaScript instead of writing raw SQL queries.
+
+```
+Without Prisma:  "SELECT * FROM products WHERE id = 1"
+With Prisma:     prisma.product.findUnique({ where: { id: 1 } })
+```
+
+### Why SQLite?
+
+SQLite is a file-based database — perfect for learning. No server setup needed, just a single file (`dev.db`).
+
+---
+
+### Step 1: Install Prisma
+
+```bash
+npm install prisma @prisma/client
+```
+
+| Package | Purpose |
+|---------|---------|
+| `prisma` | CLI tool for migrations, generating client |
+| `@prisma/client` | The library you use in your code |
+
+---
+
+### Step 2: Initialize Prisma
+
+```bash
+npx prisma init --datasource-provider sqlite
+```
+
+**What this does:**
+- Creates `prisma/schema.prisma` — where you define your data models
+- Creates `prisma.config.ts` — database configuration (Prisma 7)
+
+---
+
+### Step 3: Define Your Model
+
+Edit `prisma/schema.prisma` and add a model:
+
+```prisma
+model Product {
+  id        Int      @id @default(autoincrement())
+  name      String
+  price     Int
+  createdAt DateTime @default(now())
+}
+```
+
+**What each part means:**
+
+| Part | Meaning |
+|------|---------|
+| `model Product` | Creates a "products" table |
+| `id Int @id` | Primary key, integer |
+| `@default(autoincrement())` | Auto-generates 1, 2, 3... |
+| `name String` | Text column |
+| `createdAt DateTime` | Timestamp column |
+| `@default(now())` | Auto-sets current time |
+
+---
+
+### Step 4: Create the Database
+
+```bash
+npx prisma migrate dev --name init
+```
+
+**What this does:**
+1. Creates `dev.db` file (your SQLite database)
+2. Creates the `products` table based on your model
+3. Generates the Prisma Client (code to interact with DB)
+
+> Run this command every time you change your schema!
+
+---
+
+### Step 5: Install the Database Adapter (Prisma 7)
+
+Prisma 7 requires a **driver adapter** to connect to the database:
+
+```bash
+npm install better-sqlite3 @prisma/adapter-better-sqlite3
+```
+
+| Package | Purpose |
+|---------|---------|
+| `better-sqlite3` | SQLite driver (talks to `dev.db`) |
+| `@prisma/adapter-better-sqlite3` | Bridges Prisma to the driver |
+
+---
+
+### Step 6: Create the Prisma Client File
+
+Create `db/prisma.js`:
+
+```javascript
+const { PrismaClient } = require("@prisma/client");
+const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
+
+// Create adapter with database URL
+const adapter = new PrismaBetterSqlite3({ url: "file:./dev.db" });
+
+// Create Prisma client with the adapter
+const prisma = new PrismaClient({ adapter });
+
+module.exports = prisma;
+```
+
+**How the connection flows:**
+
+```
+Your Code  →  PrismaClient  →  Adapter  →  better-sqlite3  →  dev.db
+```
+
+---
+
+### Step 7: Use Prisma in Your Routes
+
+In your router file (e.g., `products.js`):
+
+```javascript
+const express = require("express");
+const router = express.Router();
+const prisma = require("./db/prisma");  // Import the client
+
+// GET all products
+router.get("/", async (req, res) => {
+  const products = await prisma.product.findMany();
+  res.json(products);
+});
+
+// GET single product
+router.get("/:id", async (req, res) => {
+  const product = await prisma.product.findUnique({
+    where: { id: Number(req.params.id) }
+  });
+  res.json(product);
+});
+
+// POST create product
+router.post("/", async (req, res) => {
+  const { name, price } = req.body;
+  const product = await prisma.product.create({
+    data: { name, price }
+  });
+  res.status(201).json(product);
+});
+
+module.exports = router;
+```
+
+---
+
+### Prisma Commands Cheatsheet
+
+| Command | What it does |
+|---------|--------------|
+| `npx prisma init` | Initialize Prisma in your project |
+| `npx prisma migrate dev --name <name>` | Create/update database from schema |
+| `npx prisma generate` | Regenerate Prisma Client |
+| `npx prisma studio` | Open visual database browser |
+
+---
+
+### Common Prisma Operations
+
+```javascript
+// Create
+await prisma.product.create({ data: { name: "laptop", price: 999 } });
+
+// Read all
+await prisma.product.findMany();
+
+// Read one
+await prisma.product.findUnique({ where: { id: 1 } });
+
+// Update
+await prisma.product.update({ where: { id: 1 }, data: { price: 899 } });
+
+// Delete
+await prisma.product.delete({ where: { id: 1 } });
+```
+
+---
+
+### Database File Structure
+
+After setup, you'll have:
+
+```
+express-tutorial/
+├── prisma/
+│   ├── schema.prisma      # Your data models
+│   └── migrations/        # Database change history
+├── db/
+│   └── prisma.js          # Prisma client setup
+├── dev.db                 # Your SQLite database file
+└── prisma.config.ts       # Prisma configuration
+```
+
+---
+
 ## Project Structure
 
 ```
 express-tutorial/
-├── node_modules/      # Dependencies (don't touch!)
-├── server.js          # Main server file
-├── products.js        # Product routes (Router)
-├── index.html         # Frontend example
-├── package.json       # Project config & dependencies
-├── package-lock.json  # Dependency lock file
-└── README.md          # You are here!
+├── prisma/
+│   ├── schema.prisma      # Data models (Product, User, etc.)
+│   └── migrations/        # Database migration history
+├── db/
+│   └── prisma.js          # Prisma client configuration
+├── node_modules/          # Dependencies (don't touch!)
+├── server.js              # Main server file
+├── products.js            # Product routes (Router)
+├── index.html             # Frontend example
+├── dev.db                 # SQLite database file
+├── prisma.config.ts       # Prisma configuration
+├── package.json           # Project config & dependencies
+├── package-lock.json      # Dependency lock file
+├── .gitignore             # Files to ignore in git
+└── README.md              # You are here!
 ```
 
 ---
@@ -438,12 +658,13 @@ req.path         // URL path (/products)
 
 ## What's Next?
 
-Now that we understand Express basics, you can:
+Now that you have a working Express + Prisma backend, you can:
 
-1. **Connect to a database** (MongoDB, PostgreSQL, etc.)
-2. **Add authentication** (JWT, sessions)
-3. **Build a REST API** for a frontend framework (React, Vue)
-4. **Deploy your app** to the cloud (Heroku, Railway, Vercel)
+1. **Add more models** — Users, Orders, Categories (with relations!)
+2. **Add authentication** — JWT tokens, sessions, password hashing
+3. **Build a frontend** — Connect React, Vue, or vanilla JS to your API
+4. **Switch databases** — Prisma supports PostgreSQL, MySQL, MongoDB
+5. **Deploy** — Railway, Render, Vercel, or your own server
 
 ---
 

@@ -20,3 +20,12 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Prisma
+/generated/
+*.db
+*.db-journal
+
+# Build
+dist/
+build/

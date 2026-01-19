@@ -18,6 +18,7 @@
 - [Express Router](#express-router)
 - [Middleware](#middleware)
 - [Connecting to a Database (Prisma)](#connecting-to-a-database-prisma)
+- [Clean Architecture](#clean-architecture)
 - [Project Structure](#project-structure)
 
 ---
@@ -608,25 +609,125 @@ express-tutorial/
 
 ---
 
+## Clean Architecture
+
+As your app grows, putting everything in one file becomes messy. We use a **layered architecture** to separate concerns:
+
+```
+products/
+├── product.routes.js      # Route definitions
+├── product.controller.js  # Request/response handling
+└── product.service.js     # Business logic & database
+```
+
+### Why This Structure?
+
+| Problem | Solution |
+|---------|----------|
+| One huge file with everything | Split into focused files |
+| Routes mixed with database code | Separate layers |
+| Hard to test | Each layer can be tested independently |
+| Hard to maintain | Clear responsibilities |
+
+### The Three Layers
+
+**1. Routes** (`product.routes.js`)
+
+Maps HTTP methods and URLs to controller functions.
+
+```javascript
+const express = require("express");
+const router = express.Router();
+const productController = require("./product.controller");
+
+router.get("/", productController.getAll);
+router.get("/:id", productController.getById);
+router.post("/", productController.create);
+
+module.exports = router;
+```
+
+**2. Controller** (`product.controller.js`)
+
+Handles the request and response. Calls the service layer for data.
+
+```javascript
+const productService = require("./product.service");
+
+const getAll = async (req, res) => {
+  try {
+    const products = await productService.getAllProducts();
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch products" });
+  }
+};
+
+module.exports = { getAll };
+```
+
+**3. Service** (`product.service.js`)
+
+Contains business logic and database operations. Knows nothing about HTTP.
+
+```javascript
+const prisma = require("../db/prisma");
+
+const getAllProducts = async () => {
+  return await prisma.product.findMany();
+};
+
+module.exports = { getAllProducts };
+```
+
+### Request Flow
+
+```
+Client Request
+      ↓
+   Routes      →  "Which controller handles this URL?"
+      ↓
+  Controller   →  "Parse request, call service, send response"
+      ↓
+   Service     →  "Do the actual work (database, logic)"
+      ↓
+   Database
+      ↓
+  Response back to client
+```
+
+### When to Use This Pattern
+
+| Project Size | Recommendation |
+|--------------|----------------|
+| Learning / Small | Single file is fine |
+| Medium (5+ routes) | Split into folders |
+| Large / Team | Full clean architecture |
+
+---
+
 ## Project Structure
 
 ```
 express-tutorial/
+├── products/                  # Product feature module
+│   ├── product.routes.js      # Route definitions
+│   ├── product.controller.js  # Request/response handling
+│   └── product.service.js     # Business logic & database
 ├── prisma/
-│   ├── schema.prisma      # Data models (Product, User, etc.)
-│   └── migrations/        # Database migration history
+│   ├── schema.prisma          # Data models
+│   └── migrations/            # Database migration history
 ├── db/
-│   └── prisma.js          # Prisma client configuration
-├── node_modules/          # Dependencies (don't touch!)
-├── server.js              # Main server file
-├── products.js            # Product routes (Router)
-├── index.html             # Frontend example
-├── dev.db                 # SQLite database file
-├── prisma.config.ts       # Prisma configuration
-├── package.json           # Project config & dependencies
-├── package-lock.json      # Dependency lock file
-├── .gitignore             # Files to ignore in git
-└── README.md              # You are here!
+│   └── prisma.js              # Prisma client configuration
+├── node_modules/              # Dependencies (don't touch!)
+├── server.js                  # Main server file
+├── index.html                 # Frontend example
+├── dev.db                     # SQLite database file
+├── prisma.config.ts           # Prisma configuration
+├── package.json               # Project config & dependencies
+├── package-lock.json          # Dependency lock file
+├── .gitignore                 # Files to ignore in git
+└── README.md                  # You are here!
 ```
 
 ---
